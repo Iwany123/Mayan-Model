@@ -1,20 +1,111 @@
-from tensorflow.keras.models import load_model
+html_content = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mayan Architectural Style Classifier</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; }
+        pre { background: #eee; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        code { font-family: 'Courier New', Courier, monospace; }
+        .instructions ol li { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mayan Architectural Style Classifier</h1>
+        <p>This project implements a Convolutional Neural Network (CNN) to classify images of Mayan architecture into three distinct styles: Calak Mul, Peten, and PUUC.</p>
 
-# --- Load the Model ---
-loaded_model = load_model('mayan_style_classifier.h5')
-print("Model loaded successfully!")
+        <h2>Project Goal</h2>
+        <p>The primary goal is to accurately identify the architectural style of a given Mayan structure from an image input. This classification model serves as a foundational step towards potentially exploring generative models for creating new architectural styles.</p>
 
-# --- Load the Label Encoder ---
-with open('label_encoder.pkl', 'rb') as f:
-    loaded_label_encoder = pickle.load(f)
-print("Label encoder loaded successfully!")
+        <h2>Model Architecture</h2>
+        <p>The classification model is a sequential CNN built using TensorFlow/Keras, featuring convolutional layers for feature extraction, max-pooling for dimensionality reduction, and dense layers for final classification. Dropout is included to mitigate overfitting.</p>
 
-# --- Prediction Function ---
-def predict_style(image_path, model, label_encoder, img_size=(224, 224)):
+        <h2>How to Use the Model (Python Script)</h2>
+        <p>Below is the consolidated Python script (`mayan_classifier.py`) that encapsulates the model's definition, loading mechanism, and a prediction function. To use it:</p>
+        <div class="instructions">
+            <ol>
+                <li>Save the following code as <code>mayan_classifier.py</code> in your local directory.</li>
+                <li>Ensure you have the necessary libraries installed: <code>pip install tensorflow numpy Pillow scikit-learn</code></li>
+                <li>You will need two files generated during training: <code>mayan_style_classifier.h5</code> (your trained model) and <code>label_encoder.pkl</code> (the label mapping). Place these in the same directory as <code>mayan_classifier.py</code>.</li>
+                <li>Run the script from your terminal: <code>python mayan_classifier.py</code>. It will demonstrate how to load the model and make a prediction on a dummy image.</li>
+                <li>Modify the <code>demo_image_path</code> in the <code>if __name__ == "__main__":</code> block to point to your own image for classification.</li>
+            </ol>
+        </div>
+
+        <h2><code>mayan_classifier.py</code> Code</h2>
+        <pre><code class="language-python">
+import os
+import numpy as np
+from PIL import Image
+import pickle
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+
+# --- 1. Model Definition ---
+def build_model(input_shape=(224, 224, 3), num_classes=3):
+    """Defines and compiles the CNN model for Mayan style classification."""
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
+        MaxPooling2D((2, 2)),
+        Conv2D(64, (3, 3), activation='relu'),
+        MaxPooling2D((2, 2)),
+        Conv2D(128, (3, 3), activation='relu'),
+        MaxPooling2D((2, 2)),
+        Flatten(),
+        Dense(128, activation='relu'),
+        Dropout(0.5),
+        Dense(num_classes, activation='softmax')
+    ])
+    model.compile(
+        optimizer=Adam(learning_rate=0.001),
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    return model
+
+# --- 2. Saving the Trained Model and Label Encoder (for reference) ---
+# In your training notebook, after training the 'model' and 'label_encoder':
+#
+# model_filename = 'mayan_style_classifier.h5'
+# model.save(model_filename)
+# print(f"Model saved as {model_filename}")
+#
+# label_encoder_filename = 'label_encoder.pkl'
+# with open(label_encoder_filename, 'wb') as f:
+#     pickle.dump(label_encoder, f)
+# print(f"Label encoder saved as {label_encoder_filename}")
+
+# --- 3. Loading the Model and Label Encoder ---
+def load_classifier(model_path='mayan_style_classifier.h5', label_encoder_path='label_encoder.pkl'):
+    """Loads the pre-trained model and label encoder."""
     try:
-        img = Image.open(image_path).convert('RGB')
-        img = img.resize(img_size)
-        img_array = np.array(img) / 255.0  # Normalize pixel values
+        loaded_model = load_model(model_path)
+        print(f"Model loaded successfully from {model_path}!")
+
+        with open(label_encoder_path, 'rb') as f:
+            loaded_label_encoder = pickle.load(f)
+        print(f"Label encoder loaded successfully from {label_encoder_path}!")
+        return loaded_model, loaded_label_encoder
+    except Exception as e:
+        print(f"Error loading classifier components: {e}")
+        return None, None
+
+# --- 4. Prediction Function ---
+def predict_style(image_path, model, label_encoder, img_size=(224, 224)):
+    """Predicts the architectural style of a given image."""
+    if model is None or label_encoder is None:
+        return "Error: Model or label encoder not loaded.", None
+
+    try:
+        img = Image.open(image_path).convert('RGB') # Ensure 3 channels
+        img = img.resize(img_size) # Resize image to expected input size
+        img_array = np.array(img) / 255.0  # Normalize pixel values (0-1)
         img_array = np.expand_dims(img_array, axis=0) # Add batch dimension
 
         # Make prediction
@@ -25,25 +116,58 @@ def predict_style(image_path, model, label_encoder, img_size=(224, 224)):
         confidence = np.max(predictions) * 100
         
         return predicted_style, confidence
+    except FileNotFoundError:
+        return f"Error: Image file not found at {image_path}", None
     except Exception as e:
-        return f"Error processing image: {e}", None
+        return f"Error processing image {image_path}: {e}", None
 
-# --- Demo of Prediction ---
-# Create a dummy image for demonstration purposes
-dummy_image_path = 'dummy_image.jpg'
-dummy_image = Image.fromarray(np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8))
-dummy_image.save(dummy_image_path)
+# --- 5. Example Usage ---
+if __name__ == "__main__":
+    # First, load the model and label encoder
+    classifier_model, classifier_label_encoder = load_classifier()
 
-# You would replace 'dummy_image.jpg' with the path to your actual image
-# For example, if you have an image in your Drive:
-# my_image_path = '/content/drive/MyDrive/Mayan Model July 10/Calak Mul Style/some_image.jpg'
+    if classifier_model and classifier_label_encoder:
+        print("\n--- Demonstrating Prediction ---")
+        # Create a dummy image for demonstration if a real image is not available
+        demo_image_path = 'example_mayan_image.jpg'
+        if not os.path.exists(demo_image_path):
+            dummy_image = Image.fromarray(np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8))
+            dummy_image.save(demo_image_path)
+            print(f"Created a dummy image: {demo_image_path}")
+        
+        # Replace 'demo_image_path' with the actual path to your image
+        # e.g., 'path/to/your/new_image.jpg'
+        
+        predicted_style, confidence = predict_style(
+            demo_image_path,
+            classifier_model,
+            classifier_label_encoder
+        )
 
-predicted_style, confidence = predict_style(dummy_image_path, loaded_model, loaded_label_encoder)
+        if confidence is not None:
+            print(f"Predicted Style for '{demo_image_path}': {predicted_style} (Confidence: {confidence:.2f}%) ")
+        else:
+            print(f"Prediction failed: {predicted_style}")
 
-if confidence is not None:
-    print(f"\nPredicted Style for {dummy_image_path}: {predicted_style} (Confidence: {confidence:.2f}%) ")
-else:
-    print(f"\n{predicted_style}")
+        # Clean up dummy image if created
+        if os.path.exists(demo_image_path) and demo_image_path == 'example_mayan_image.jpg':
+            os.remove(demo_image_path)
+            print(f"Cleaned up dummy image: {demo_image_path}")
+    else:
+        print("Cannot proceed with prediction without a loaded model and label encoder.")
+        </code></pre>
 
-# Clean up the dummy image
-os.remove(dummy_image_path)
+        <footer>
+            <p>&copy; 2024 Mayan Architectural Style Classifier Project. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
+'''
+
+# You can print this content and save it as 'index.html' in your GitHub repository.
+# For demonstration purposes within Colab, we can create the file:
+with open('index.html', 'w') as f:
+    f.write(html_content)
+
+print("HTML content saved to 'index.html'. You can download this file and upload it to your GitHub repository.")
