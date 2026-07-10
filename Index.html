@@ -1,0 +1,49 @@
+from tensorflow.keras.models import load_model
+
+# --- Load the Model ---
+loaded_model = load_model('mayan_style_classifier.h5')
+print("Model loaded successfully!")
+
+# --- Load the Label Encoder ---
+with open('label_encoder.pkl', 'rb') as f:
+    loaded_label_encoder = pickle.load(f)
+print("Label encoder loaded successfully!")
+
+# --- Prediction Function ---
+def predict_style(image_path, model, label_encoder, img_size=(224, 224)):
+    try:
+        img = Image.open(image_path).convert('RGB')
+        img = img.resize(img_size)
+        img_array = np.array(img) / 255.0  # Normalize pixel values
+        img_array = np.expand_dims(img_array, axis=0) # Add batch dimension
+
+        # Make prediction
+        predictions = model.predict(img_array)
+        predicted_class_index = np.argmax(predictions, axis=1)[0]
+        predicted_style = label_encoder.inverse_transform([predicted_class_index])[0]
+        
+        confidence = np.max(predictions) * 100
+        
+        return predicted_style, confidence
+    except Exception as e:
+        return f"Error processing image: {e}", None
+
+# --- Demo of Prediction ---
+# Create a dummy image for demonstration purposes
+dummy_image_path = 'dummy_image.jpg'
+dummy_image = Image.fromarray(np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8))
+dummy_image.save(dummy_image_path)
+
+# You would replace 'dummy_image.jpg' with the path to your actual image
+# For example, if you have an image in your Drive:
+# my_image_path = '/content/drive/MyDrive/Mayan Model July 10/Calak Mul Style/some_image.jpg'
+
+predicted_style, confidence = predict_style(dummy_image_path, loaded_model, loaded_label_encoder)
+
+if confidence is not None:
+    print(f"\nPredicted Style for {dummy_image_path}: {predicted_style} (Confidence: {confidence:.2f}%) ")
+else:
+    print(f"\n{predicted_style}")
+
+# Clean up the dummy image
+os.remove(dummy_image_path)
